@@ -1,0 +1,45 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - run: go version
+
+      - uses: golangci/golangci-lint-action@v6
+        with:
+          version: v2.12.2
+
+      - run: go test ./...
+
+      - name: Build
+        run: |
+          mkdir -p dist
+          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o dist/run-cmd-linux-amd64 .
+          GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o dist/run-cmd-linux-arm64 .
+          GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o dist/run-cmd-darwin-amd64 .
+          GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o dist/run-cmd-darwin-arm64 .
+          GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o dist/run-cmd-windows-amd64.exe .
+          cd dist && sha256sum * > sha256sums.txt
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
